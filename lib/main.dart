@@ -448,20 +448,47 @@ class _CanKeypadScreenState extends State<CanKeypadScreen> {
     }
   }
 
-  Widget build2x2Keypad() {
+
+
+  Widget _buildKeyButton(String label) {
+    return ElevatedButton(
+      key: Key(label),
+      onPressed: () => _handleButtonPress(label),
+      child: Text(label),
+    );
+  }
+
+Widget build2x2Keypad() {
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Container(
-        decoration: _keypadBoxDecoration(),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          border: Border.all(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(8),
+        ),
         padding: const EdgeInsets.all(12),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          alignment: WrapAlignment.center,
-          children: List.generate(
-            keypad2x2.length,
-            (index) => buildKeypadButton(keypad2x2[index]),
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildKeyButton('K1'),
+                const SizedBox(width: 16),
+                _buildKeyButton('K2'),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildKeyButton('K3'),
+                const SizedBox(width: 16),
+                _buildKeyButton('K4'),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -471,20 +498,35 @@ class _CanKeypadScreenState extends State<CanKeypadScreen> {
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Container(
-        decoration: _keypadBoxDecoration(),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          border: Border.all(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(8),
+        ),
         padding: const EdgeInsets.all(12),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          alignment: WrapAlignment.center,
-          children: List.generate(
-            keypad2x6.length,
-            (index) => buildKeypadButton(keypad2x6[index]),
-          ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(6, (i) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                child: _buildKeyButton('F${i + 1}'),
+              )),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(6, (i) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                child: _buildKeyButton('F${i + 7}'),
+              )),
+            ),
+          ],
         ),
       ),
     );
   }
+
 
   Widget buildKeypadButton(String label) {
     final is2x2 = ['K1', 'K2', 'K3', 'K4'].contains(label);
@@ -494,6 +536,7 @@ class _CanKeypadScreenState extends State<CanKeypadScreen> {
         width: 80,
         height: 80,
         child: AnimatedContainer(
+          key: Key(label),
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
           transform:
@@ -549,6 +592,13 @@ class _CanKeypadScreenState extends State<CanKeypadScreen> {
   final ScrollController _logScrollController = ScrollController();
   // Handles press logic for 2x2 and 2x6 buttons, updates CAN bytes and logs
   void _handleButtonPress(String label) {
+    setState(() {
+      buttonStates[label] = !(buttonStates[label] ?? false);
+    });
+
+    if (widget.testMode) {
+      debugPrint('TEST LOG: $label was pressed');
+    }
     HapticFeedback.lightImpact();
     final elapsed = _stopwatch.elapsed;
     final timestamp =
@@ -567,7 +617,7 @@ class _CanKeypadScreenState extends State<CanKeypadScreen> {
         dataBytes[byteIndex] &= ~(1 << bitIndex);
       }
     }
-
+/*
     // Handle 2x2 LED buttons (LED control bytes)
     if (ledButtonMap.containsKey(label)) {
       final byteIndex = ledButtonMap[label]![0];
@@ -578,6 +628,7 @@ class _CanKeypadScreenState extends State<CanKeypadScreen> {
         ledBytes[byteIndex] &= ~(1 << bitIndex);
       }
     }
+    */
 
     String formattedData;
     String canId;
@@ -604,7 +655,16 @@ class _CanKeypadScreenState extends State<CanKeypadScreen> {
               .toUpperCase();
 
       canId = '00000180'; // 0x180 + 0x25 = 0x1A5 (PKP2200 keypad state frame)
-
+    // Handle 2x2 LED buttons (LED control bytes)
+    if (ledButtonMap.containsKey(label)) {
+      final byteIndex = ledButtonMap[label]![0];
+      final bitIndex = ledButtonMap[label]![1];
+      if (buttonStates[label] == true) {
+        ledBytes[byteIndex] |= (1 << bitIndex);
+      } else {
+        ledBytes[byteIndex] &= ~(1 << bitIndex);
+      }
+    }
       int state = ledBytes[0];
       List<String> keyStates = [];
       if ((state & 0x01) != 0) keyStates.add("Key #1");
@@ -794,6 +854,7 @@ class _CanKeypadScreenState extends State<CanKeypadScreen> {
           maxWidth: 140, // restrict button width to avoid overflow
         ),
         child: ElevatedButton.icon(
+          key: Key(label),
           onPressed: () => _handleButtonPress(label),
           icon: Icon(
             icon ?? Icons.help_outline,
@@ -1155,107 +1216,83 @@ class _CanKeypadScreenState extends State<CanKeypadScreen> {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             // 2x2 Keypad Section
-                            Expanded(
-                              flex: 1,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '2x2 Keypad (PKP2200 - Node ID: 25h)',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium?.copyWith(
-                                      color: Colors.tealAccent,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '2x2 Keypad (PKP2200 - Node ID: 25h)',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium?.copyWith(
+                                    color: Colors.tealAccent,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Pressed: ${getPressed2x2Buttons()}',
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                    ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Pressed: ${getPressed2x2Buttons()}',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    height: 240,
-                                    child: SingleChildScrollView(
-                                      padding: const EdgeInsets.all(12),
-                                      child: Column(
-                                        children: [
-                                          build2x2Keypad(),
-                                          const SizedBox(height: 16),
-                                          build2x6Keypad(),
-                                        ],
-                                      ),
-                                    ),
+                                ),
+                                const SizedBox(height: 12),
+                                build2x2Keypad(),
+                                const SizedBox(height: 12),
+                                ElevatedButton.icon(
+                                  onPressed: _clear2x2Buttons,
+                                  icon: const Icon(Icons.clear),
+                                  label: const Text('Clear 2x2'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red.shade800,
                                   ),
-                                  const SizedBox(height: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: _clear2x2Buttons,
-                                    icon: const Icon(Icons.clear),
-                                    label: const Text('Clear 2x2'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red.shade800,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
 
-                            // Vertical Divider
-                            VerticalDivider(
-                              width: 32,
+                            const Divider(
+                              height: 36,
                               thickness: 1,
                               color: Colors.white24,
                             ),
 
                             // 2x6 Keypad Section
-                            Expanded(
-                              flex: 2,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '2x6 Keypad (PKP2600 - Node ID: 15h)',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium?.copyWith(
-                                      color: Colors.tealAccent,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '2x6 Keypad (PKP2600 - Node ID: 15h)',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium?.copyWith(
+                                    color: Colors.tealAccent,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Pressed: ${getPressed2x6Buttons()}',
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                    ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Pressed: ${getPressed2x6Buttons()}',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    height: 240,
-                                    child: SingleChildScrollView(
-                                      child: build2x6Keypad(),
-                                    ),
+                                ),
+                                const SizedBox(height: 12),
+                                build2x6Keypad(),
+                                const SizedBox(height: 12),
+                                ElevatedButton.icon(
+                                  onPressed: _clear2x6Buttons,
+                                  icon: const Icon(Icons.clear_all),
+                                  label: const Text('Clear 2x6'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red.shade700,
                                   ),
-                                  const SizedBox(height: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: _clear2x6Buttons,
-                                    icon: const Icon(Icons.clear_all),
-                                    label: const Text('Clear 2x6'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
