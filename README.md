@@ -96,4 +96,4 @@ flutter drive \
 
 ---
 
-© 2025 Kerry Kanhai. All rights reserved.
+© 2025 Kerry K @ Flodraulic. All rights reserved.
